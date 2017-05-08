@@ -171,40 +171,42 @@
 }
 
 - (BOOL)processInvocation:(NSInvocation *)anInvocation {
-    if (![self.messagePattern matchesInvocation:anInvocation])
-        return NO;
-	
-	if (self.block) {
-		NSUInteger numberOfArguments = [[anInvocation methodSignature] numberOfArguments];
-		NSMutableArray *args = [NSMutableArray arrayWithCapacity:(numberOfArguments-2)];
-		for (NSUInteger i = 2; i < numberOfArguments; ++i) {
-			id arg = [anInvocation getArgumentAtIndexAsObject:(int)i];
-			
-			const char *argType = [[anInvocation methodSignature] getArgumentTypeAtIndex:i];
-			if (strcmp(argType, "@?") == 0) arg = [arg copy];
-            
-            if (arg == nil)
-                arg = [NSNull null];
-            
-			[args addObject:arg];
-		}
-		
-		id newValue = self.block(args);
-		if (newValue != value) {
-			value = newValue;
-		}
-		
-		[args removeAllObjects]; // We don't want these objects to be in autorelease pool
-	}
+    @synchronized (self) {
+        if (![self.messagePattern matchesInvocation:anInvocation])
+            return NO;
 
-    if (self.value == nil)
-        [self writeZerosToInvocationReturnValue:anInvocation];
-    else if ([self.value isKindOfClass:[KWValue class]])
-        [self writeWrappedValueToInvocationReturnValue:anInvocation];
-    else
-        [self writeObjectValueToInvocationReturnValue:anInvocation];
+        if (self.block) {
+            NSUInteger numberOfArguments = [[anInvocation methodSignature] numberOfArguments];
+            NSMutableArray *args = [NSMutableArray arrayWithCapacity:(numberOfArguments-2)];
+            for (NSUInteger i = 2; i < numberOfArguments; ++i) {
+                id arg = [anInvocation getArgumentAtIndexAsObject:(int)i];
 
-    return YES;
+                const char *argType = [[anInvocation methodSignature] getArgumentTypeAtIndex:i];
+                if (strcmp(argType, "@?") == 0) arg = [arg copy];
+
+                if (arg == nil)
+                    arg = [NSNull null];
+
+                [args addObject:arg];
+            }
+
+            id newValue = self.block(args);
+            if (newValue != value) {
+                value = newValue;
+            }
+
+            [args removeAllObjects]; // We don't want these objects to be in autorelease pool
+        }
+
+        if (self.value == nil)
+            [self writeZerosToInvocationReturnValue:anInvocation];
+        else if ([self.value isKindOfClass:[KWValue class]])
+            [self writeWrappedValueToInvocationReturnValue:anInvocation];
+        else
+            [self writeObjectValueToInvocationReturnValue:anInvocation];
+        
+        return YES;
+    }
 }
 
 #pragma mark - Debugging
